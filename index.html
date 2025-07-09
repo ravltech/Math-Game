@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Math Puzzle Game</title>
+  <style>
+    :root {
+      --bg-light: #f0f4f8;
+      --bg-dark: #121212;
+      --text-light: #333;
+      --text-dark: #eee;
+      --card-light: #ffffff;
+      --card-dark: #1e1e1e;
+      --accent: #4f46e5;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: var(--bg-light);
+      color: var(--text-light);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body.dark-mode {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .container {
+      background: var(--card-light);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      transition: background 0.3s;
+    }
+
+    body.dark-mode .container {
+      background: var(--card-dark);
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 10px;
+      margin: 10px 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .btn:hover {
+      background: #3730a3;
+    }
+
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .option {
+      background: #e0e7ff;
+      padding: 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 18px;
+      transition: 0.2s;
+    }
+
+    .option:hover {
+      background: #c7d2fe;
+    }
+
+    body.dark-mode .option {
+      background: #2d2d64;
+      color: white;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .message {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #d97706;
+    }
+
+    .scorebox {
+      margin: 10px 0;
+      font-size: 16px;
+    }
+
+    .top-buttons {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #888;
+    }
+
+    body.dark-mode .footer {
+      color: #ccc;
+    }
+
+    .score-history {
+      font-size: 14px;
+      margin-top: 10px;
+      color: #555;
+    }
+
+    body.dark-mode .score-history {
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-buttons">
+  <button id="darkModeToggle" class="btn">🌙 Dark Mode</button>
+  <button id="musicToggle" class="btn">🎵 Music: On</button>
+  <button id="soundToggle" class="btn">🎚️ Mute: Off</button>
+</div>
+
+<div class="container">
+  <!-- Audio Elements -->
+  <audio id="soundCorrect" src="https://www.soundjay.com/buttons/sounds/button-09.mp3" preload="auto"></audio>
+  <audio id="soundWrong" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
+  <audio id="soundGameOver" src="https://www.soundjay.com/button/beep-06.mp3" preload="auto"></audio>
+  <audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_d3473fa843.mp3?filename=calm-lofi-beat-110042.mp3" loop preload="auto"></audio>
+
+  <!-- Start Screen -->
+  <div id="startScreen">
+    <h1>🧠 Select Difficulty</h1>
+    <button class="btn" onclick="startGame('easy')">😊 Easy</button>
+    <button class="btn" onclick="startGame('medium')">😎 Medium</button>
+    <button class="btn" onclick="startGame('hard')">💀 Hard</button>
+  </div>
+
+  <!-- Quiz Screen -->
+  <div id="quizScreen" class="hidden">
+    <h1 id="question">❓ Question</h1>
+    <div class="options" id="optionsContainer"></div>
+    <div class="scorebox">
+      ⏱ <span id="timer">15</span>s |
+      ❤️ <span id="lives">3</span> |
+      🎯 Score: <span id="score">0</span> |
+      🏆 High Score: <span id="highScore">0</span>
+    </div>
+    <div class="message" id="message"></div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="gameOverScreen" class="hidden">
+    <h1>🚨 Game Over</h1>
+    <p>🎯 Your Score: <span id="finalScore"></span></p>
+    <div class="score-history">
+      📊 Past Scores:
+      <ul id="scoreHistoryList"></ul>
+    </div>
+    <button class="btn" onclick="restartGame()">🔁 Play Again</button>
+  </div>
+
+  <div class="footer">Made by Ravl</div>
+</div>
+
+<script>
+  let min = 1, max = 10;
+  let currentAnswer = 0;
+  let score = 0;
+  let highScore = localStorage.getItem('mathHighScore') || 0;
+  let pastScores = JSON.parse(localStorage.getItem('mathScoreHistory')) || [];
+  let questionCount = 0;
+  let lives = 3;
+  let timer = 15;
+  let interval;
+  let soundMuted = false;
+
+  const questionEl = document.getElementById("question");
+  const optionsContainer = document.getElementById("optionsContainer");
+  const scoreEl = document.getElementById("score");
+  const livesEl = document.getElementById("lives");
+  const timerEl = document.getElementById("timer");
+  const messageEl = document.getElementById("message");
+  const highScoreEl = document.getElementById("highScore");
+  const finalScoreEl = document.getElementById("finalScore");
+  const scoreHistoryList = document.getElementById("scoreHistoryList");
+
+  const startScreen = document.getElementById("startScreen");
+  const quizScreen = document.getElementById("quizScreen");
+  const gameOverScreen = document.getElementById("gameOverScreen");
+
+  const soundCorrect = document.getElementById("soundCorrect");
+  const soundWrong = document.getElementById("soundWrong");
+  const soundGameOver = document.getElementById("soundGameOver");
+  const bgMusic = document.getElementById("bgMusic");
+
+  const musicToggle = document.getElementById("musicToggle");
+  const soundToggle = document.getElementById("soundToggle");
+  const darkModeToggle = document.getElementById("darkModeToggle");
+
+  musicToggle.addEventListener("click", () => {
+    if (bgMusic.paused) {
+      bgMusic.play();
+      musicToggle.textContent = "🎵 Music: On";
+    } else {
+      bgMusic.pause();
+      musicToggle.textContent = "🔇 Music: Off";
+    }
+  });
+
+  soundToggle.addEventListener("click", () => {
+    soundMuted = !soundMuted;
+    soundToggle.textContent = soundMuted ? "🎚️ Mute: On" : "🎚️ Mute: Off";
+  });
+
+  darkModeToggle.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    darkModeToggle.textContent = document.body.classList.contains("dark-mode")
+      ? "☀️ Light Mode"
+      : "🌙 Dark Mode";
+  });
+
+  function startGame(level) {
+    if (level === 'easy') { min = 1; max = 10; }
+    else if (level === 'medium') { min = 10; max = 50; }
+    else if (level === 'hard') { min = 50; max = 100; }
+
+    score = 0;
+    lives = 3;
+    questionCount = 0;
+
+    scoreEl.textContent = score;
+    livesEl.textContent = lives;
+    highScoreEl.textContent = highScore;
+
+    startScreen.classList.add("hidden");
+    gameOverScreen.classList.add("hidden");
+    quizScreen.classList.remove("hidden");
+
+    bgMusic.play();
+    generateQuestion();
+  }
+
+  function generateQuestion() {
+    clearInterval(interval);
+    messageEl.textContent = "";
+
+    if (questionCount >= 100 || lives <= 0) {
+      endGame();
+      return;
+    }
+
+    questionCount++;
+    const num1 = getRandom(min, max);
+    const num2 = getRandom(min, max);
+    const ops = ['+', '-', '*', '/'];
+    const op = ops[getRandom(0, ops.length - 1)];
+
+    let questionText = `${num1} ${op} ${num2}`;
+    let answer = 0;
+
+    switch (op) {
+      case '+': answer = num1 + num2; break;
+      case '-': answer = num1 - num2; break;
+      case '*': answer = num1 * num2; break;
+      case '/': answer = parseFloat((num1 / num2).toFixed(2)); break;
+    }
+
+    currentAnswer = answer;
+    questionEl.textContent = `❓ What is ${questionText}?`;
+    generateOptions(answer);
+    startTimer();
+  }
+
+  function generateOptions(correctAnswer) {
+    optionsContainer.innerHTML = "";
+    let answers = [correctAnswer];
+
+    while (answers.length < 4) {
+      let fake = parseFloat((correctAnswer + getRandom(-10, 10)).toFixed(2));
+      if (!answers.includes(fake)) answers.push(fake);
+    }
+
+    answers.sort(() => Math.random() - 0.5);
+
+    answers.forEach(ans => {
+      const btn = document.createElement("div");
+      btn.className = "option";
+      btn.textContent = ans;
+      btn.onclick = () => checkAnswer(ans);
+      optionsContainer.appendChild(btn);
+    });
+  }
+
+  function checkAnswer(selected) {
+    if (parseFloat(selected) === parseFloat(currentAnswer)) {
+      if (!soundMuted) soundCorrect.play();
+      score++;
+      scoreEl.textContent = score;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('mathHighScore', highScore);
+        highScoreEl.textContent = highScore;
+      }
+      generateQuestion();
+    } else {
+      if (!soundMuted) soundWrong.play();
+      if (navigator.vibrate) navigator.vibrate(200);
+      messageEl.textContent = "❌ Try again!";
+      lives--;
+      livesEl.textContent = lives;
+      if (lives <= 0) {
+        endGame();
+      }
+    }
+  }
+
+  function startTimer() {
+    timer = 15;
+    timerEl.textContent = timer;
+    interval = setInterval(() => {
+      timer--;
+      timerEl.textContent = timer;
+      if (timer === 0) {
+        clearInterval(interval);
+        messageEl.textContent = "⏰ Time's up!";
+        lives--;
+        livesEl.textContent = lives;
+        if (navigator.vibrate) navigator.vibrate(200);
+        if (lives <= 0) {
+          endGame();
+        } else {
+          generateQuestion();
+        }
+      }
+    }, 1000);
+  }
+
+  function endGame() {
+    clearInterval(interval);
+    if (!soundMuted) soundGameOver.play();
+    bgMusic.pause();
+    quizScreen.classList.add("hidden");
+    gameOverScreen.classList.remove("hidden");
+    finalScoreEl.textContent = score;
+
+    pastScores.push(score);
+    if (pastScores.length > 5) pastScores.shift(); // Keep latest 5 scores
+    localStorage.setItem('mathScoreHistory', JSON.stringify(pastScores));
+    renderScoreHistory();
+  }
+
+  function renderScoreHistory() {
+    scoreHistoryList.innerHTML = "";
+    pastScores.slice().reverse().forEach((s, i) => {
+      const li = document.createElement("li");
+      li.textContent = `#${i + 1}: ${s} pts`;
+      scoreHistoryList.appendChild(li);
+    });
+  }
+
+  function restartGame() {
+    startScreen.classList.remove("hidden");
+    gameOverScreen.classList.add("hidden");
+  }
+
+  function getRandom(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+</script>
+
+</body>
+</html>
